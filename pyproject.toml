@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "retro_downloader"
+authors = [
+    { name = "Jason A. Regina", email = "jason.regina@noaa.gov" },
+]
+description = "A command-line utility for downloading and reformatting National Water Model Retrospective output."
+readme = "README.md"
+requires-python = ">=3.13"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Education",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Hydrology",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "click",
+    "pandas",
+    "xarray",
+    "netcdf4"
+]
+dynamic = ["version"]
+
+[tool.setuptools.dynamic]
+version = { attr = "retro_downloader._version.__version__" }
+
+[project.optional-dependencies]
+develop = ["pytest"]
+
+[project.urls]
+Homepage = "https://github.com/jarq6c/retro-downloader"
+Documentation = "https://jarq6c.github.io/retro-downloader"
+Repository = "https://github.com/jarq6c/retro-downloader"
+"Bug Tracker" = "https://github.com/jarq6c/retro-downloader/issues"
+
+[project.scripts]
+retro-downloader = "retro_downloader.cli:cli"
