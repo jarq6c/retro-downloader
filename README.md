@@ -30,6 +30,9 @@ Options:
   -v, --variable [qBtmVertRunoff|qBucket|qSfcLatRunoff|q_lateral|streamflow|velocity]
                                   Channel route variable. Defaults to
                                   'streamflow'.
+  -m, --mapping FILE              GeoJSON mapping from USGS sites codes to RFC
+                                  and WFO. Default
+                                  usgs_rfc_wfo_mapping.geojson
   --help                          Show this message and exit.
 ```
 
