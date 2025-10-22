@@ -24,7 +24,9 @@ dependencies = [
     "click",
     "pandas",
     "xarray",
-    "netcdf4"
+    "netcdf4",
+    "zarr",
+    "s3fs"
 ]
 dynamic = ["version"]
 
