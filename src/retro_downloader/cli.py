@@ -2,7 +2,7 @@
 from pathlib import Path
 import logging
 from dataclasses import dataclass
-from typing import Literal
+from enum import StrEnum
 
 import click
 import xarray as xr
@@ -34,7 +34,7 @@ SOURCES: list[DataSource] = [
 
 def get_logger(name: str = "retro_downloader") -> logging.Logger:
     """
-    Generate and a return a logger.
+    Generate and return a logger.
 
     Paramters
     ---------
@@ -55,19 +55,18 @@ def get_logger(name: str = "retro_downloader") -> logging.Logger:
         logger.addHandler(ch)
     return logger
 
-ChannelRouteVariable = Literal[
-    'qBtmVertRunoff',
-    'qBucket',
-    'qSfcLatRunoff',
-    'q_lateral',
-    'streamflow',
-    'velocity'
-]
-"""National Water Model Retrospective xarray.Dataset variables."""
+class ChannelRouteVariable(StrEnum):
+    """National Water Model Retrospective xarray.Dataset variables."""
+    Q_BTM_VERT_RUNOFF = "qBtmVertRunoff"
+    Q_BUCKET = "qBucket"
+    Q_SFC_LAT_RUNOFF = "qSfcLatRunoff"
+    Q_LATERAL = "q_lateral"
+    STREAMFLOW = "streamflow"
+    VELOCITY = "velocity"
 
 def main(
         destination: Path,
-        variable: ChannelRouteVariable = "streamflow"
+        variable: ChannelRouteVariable = ChannelRouteVariable.STREAMFLOW
 ) -> None:
     """
     Download and process National Water Model version 3.0 Retrospective
@@ -112,6 +111,7 @@ def main(
 
         # Download and process chunks
         logger.info("Processing chunks")
+        logger.info("%d feature chunks", len(feature_chunks))
         blank_gage_code = ''.rjust(15).encode()
         chunk = 0
         for gage_indexes, feature_indexes in zip(gage_id_chunks, feature_chunks):
@@ -121,6 +121,7 @@ def main(
                 ifiles = []
 
                 # Collect all times for gage set
+                logger.info("Retrieving %d time chunks", len(time_chunks))
                 for time_indexes in time_chunks:
                     # Check for existing file
                     ofile = raw_dir / f"chunk_{chunk}.nc"
@@ -188,16 +189,22 @@ def main(
         break
 
 @click.command()
-def cli() -> None:
+@click.option("-d", "--destination", "destination", nargs=1, required=True,
+    type=click.Path(file_okay=False, path_type=Path),
+    help="Destination directory to build archive.")
+@click.option("-v", "--variable", "variable", nargs=1,
+    type=click.Choice([v.value for v in ChannelRouteVariable]),
+    help="Channel route variable. Defaults to 'streamflow'.", default="streamflow")
+def cli(
+        destination: Path | None = None,
+        variable: ChannelRouteVariable = ChannelRouteVariable.STREAMFLOW
+) -> None:
     """
     Download and process National Water Model version 3.0 Retrospective
     output. This specifically retrieves output from the "channel route"
     zarr stores for Alasak, Hawaii, Puerto Rico, and CONUS.
     """
-    main(
-        Path("./data"),
-        "streamflow"
-    )
+    main(destination, ChannelRouteVariable(variable))
 
 if __name__ == "__main__":
     cli()

@@ -26,7 +26,8 @@ dependencies = [
     "xarray",
     "netcdf4",
     "zarr",
-    "s3fs"
+    "s3fs",
+    "geopandas"
 ]
 dynamic = ["version"]
 
