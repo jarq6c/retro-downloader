@@ -8,6 +8,9 @@ from pathlib import Path
 import logging
 from dataclasses import dataclass
 from enum import StrEnum
+import getpass
+import json
+import yaml
 
 import click
 import xarray as xr
@@ -281,18 +284,87 @@ def generate_symlinks(
 
     # RFCs
     logger.info("Generating RFC symlinks")
+    file_log = {
+        "metadata": {
+            "created_by": getpass.getuser(),
+            "created_on": str(pd.Timestamp.utcnow()),
+            "model": "National Water Model",
+            "model_version": "v3.0",
+            "grouped_by": "RFC"
+            }
+    }
+    feature_template = {}
     for (rfc, domain), gdf in geomap.groupby(["RFC_NAME", "domain"]):
         idir = destination / f"csv/{domain}"
         odir = destination / f"rfc/{rfc}"
         odir.mkdir(exist_ok=True, parents=True)
-        for feature_id in gdf["feature_id"]:
-            target = idir / f"{feature_id}_nwm_3_0_retro_wres.csv.gz"
+        site_list = file_log.get(rfc, [])
+        feature_list = feature_template.get(rfc, [])
+        for row in gdf.itertuples():
+            target = idir / f"{row.feature_id}_nwm_3_0_retro_wres.csv.gz"
             if not target.exists():
                 continue
             link = odir / target.name
+            site_list.append(str(link.absolute()))
+            feature_list.append({"observed": row.STAID, "predicted": row.feature_id})
             if not link.is_symlink():
                 logger.info("%s -> %s", link, target.absolute())
                 link.symlink_to(target.absolute())
+        file_log[rfc] = site_list
+        feature_template[rfc] = feature_list
+
+    # Generate RFC listing
+    log_file = destination / "rfc_available_retrospective_csv_files_listing.json"
+    logger.info("Writing %s", log_file)
+    output = json.dumps(file_log, indent=2)
+    with log_file.open("w") as fo:
+        fo.write(output)
+    feature_mapping = destination / "rfc_feature_mapping.yaml"
+    logger.info("Writing %s", feature_mapping)
+    with feature_mapping.open("w") as fo:
+        yaml.dump(feature_template, fo)
+
+    # WFOs
+    logger.info("Generating WFO symlinks")
+    file_log = {
+        "metadata": {
+            "created_by": getpass.getuser(),
+            "created_on": str(pd.Timestamp.utcnow()),
+            "model": "National Water Model",
+            "model_version": "v3.0",
+            "grouped_by": "WFO"
+            }
+    }
+    feature_template = {}
+    for (wfo, domain), gdf in geomap.groupby(["WFO", "domain"]):
+        idir = destination / f"csv/{domain}"
+        odir = destination / f"wfo/{wfo}"
+        odir.mkdir(exist_ok=True, parents=True)
+        site_list = file_log.get(wfo, [])
+        feature_list = feature_template.get(wfo, [])
+        for row in gdf.itertuples():
+            target = idir / f"{row.feature_id}_nwm_3_0_retro_wres.csv.gz"
+            if not target.exists():
+                continue
+            link = odir / target.name
+            site_list.append(str(link.absolute()))
+            feature_list.append({"observed": row.STAID, "predicted": row.feature_id})
+            if not link.is_symlink():
+                logger.info("%s -> %s", link, target.absolute())
+                link.symlink_to(target.absolute())
+        file_log[wfo] = site_list
+        feature_template[wfo] = feature_list
+
+    # Generate WFO listing
+    log_file = destination / "wfo_available_retrospective_csv_files_listing.json"
+    logger.info("Writing %s", log_file)
+    output = json.dumps(file_log, indent=2)
+    with log_file.open("w") as fo:
+        fo.write(output)
+    feature_mapping = destination / "wfo_feature_mapping.yaml"
+    logger.info("Writing %s", feature_mapping)
+    with feature_mapping.open("w") as fo:
+        yaml.dump(feature_template, fo)
 
 @click.command()
 @click.option("-d", "--destination", "destination", nargs=1, required=True,
