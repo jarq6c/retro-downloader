@@ -209,7 +209,6 @@ def download_to_netcdf(
 
                     # Add for processing
                     ifiles.append(ofile)
-                    break
 
                 # Process
                 logger.info("Processing chunks")
@@ -248,12 +247,10 @@ def download_to_netcdf(
                         date_format="%Y-%m-%dT%H:%M:%SZ",
                         compression="gzip"
                     )
-                break
 
         # Close dataset
         logger.info("Closing dataset")
         ds.close()
-        break
 
 def generate_symlinks(
         destination: Path,
@@ -382,7 +379,7 @@ def cli(
     output. This specifically retrieves output from the "channel route"
     zarr stores for Alasak, Hawaii, Puerto Rico, and CONUS.
     """
-    # download_to_netcdf(destination, ChannelRouteVariable(variable))
+    download_to_netcdf(destination, ChannelRouteVariable(variable))
     generate_symlinks(destination, Path("usgs_rfc_wfo_mapping.geojson"))
 
 if __name__ == "__main__":
