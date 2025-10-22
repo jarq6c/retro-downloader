@@ -13,6 +13,7 @@ import click
 import xarray as xr
 import numpy as np
 import pandas as pd
+import geopandas as gpd
 
 @dataclass
 class DataSource:
@@ -115,6 +116,7 @@ def build_routelink(destination: Path) -> pd.DataFrame:
 
         gages["gage_id"] = gages["gage_id"].str.decode("utf-8").str.strip()
         gages = gages.loc[gages["gage_id"] != ""]
+        gages["domain"] = source.label
         dfs.append(gages)
 
     # Merge
@@ -126,7 +128,7 @@ def build_routelink(destination: Path) -> pd.DataFrame:
     routelink.to_parquet(ofile, engine="pyarrow")
     return routelink
 
-def main(
+def download_to_netcdf(
         destination: Path,
         variable: ChannelRouteVariable = ChannelRouteVariable.STREAMFLOW
 ) -> None:
@@ -145,9 +147,6 @@ def main(
     """
     # Logger
     logger = get_logger()
-
-    # Load crosswalk
-    routelink = build_routelink(destination)
 
     # Process each source
     for source in SOURCES:
@@ -253,6 +252,48 @@ def main(
         ds.close()
         break
 
+def generate_symlinks(
+        destination: Path,
+        usgs_rfc_wfo_file: Path
+) -> None:
+    """
+    Generate symlinks to compressed CSVs organized by RFC and WFO.
+
+    Parameters
+    ----------
+    destination: pathlib.Path
+        Path to root download directly.
+    usgs_rfc_wfo_file: pathlib.Path
+        GeoJSON file containing mapping from USGS site codes to RFCs and WFOs.
+    """
+    # Logger
+    logger = get_logger()
+
+    # Load routelink
+    routelink = build_routelink(destination).reset_index().set_index("gage_id")
+
+    # Load mapping
+    logger.info("Loading %s", usgs_rfc_wfo_file)
+    geomap = gpd.read_file(usgs_rfc_wfo_file)
+    geomap = geomap[geomap["STAID"].isin(routelink.index)]
+    geomap["feature_id"] = geomap["STAID"].map(routelink["feature_id"])
+    geomap["domain"] = geomap["STAID"].map(routelink["domain"])
+
+    # RFCs
+    logger.info("Generating RFC symlinks")
+    for (rfc, domain), gdf in geomap.groupby(["RFC_NAME", "domain"]):
+        idir = destination / f"csv/{domain}"
+        odir = destination / f"rfc/{rfc}"
+        odir.mkdir(exist_ok=True, parents=True)
+        for feature_id in gdf["feature_id"]:
+            target = idir / f"{feature_id}_nwm_3_0_retro_wres.csv.gz"
+            if not target.exists():
+                continue
+            link = odir / target.name
+            if not link.is_symlink():
+                logger.info("%s -> %s", link, target.absolute())
+                link.symlink_to(target.absolute())
+
 @click.command()
 @click.option("-d", "--destination", "destination", nargs=1, required=True,
     type=click.Path(file_okay=False, path_type=Path),
@@ -269,7 +310,8 @@ def cli(
     output. This specifically retrieves output from the "channel route"
     zarr stores for Alasak, Hawaii, Puerto Rico, and CONUS.
     """
-    main(destination, ChannelRouteVariable(variable))
+    # download_to_netcdf(destination, ChannelRouteVariable(variable))
+    generate_symlinks(destination, Path("usgs_rfc_wfo_mapping.geojson"))
 
 if __name__ == "__main__":
     cli()
