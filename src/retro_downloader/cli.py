@@ -370,9 +370,15 @@ def generate_symlinks(
 @click.option("-v", "--variable", "variable", nargs=1,
     type=click.Choice([v.value for v in ChannelRouteVariable]),
     help="Channel route variable. Defaults to 'streamflow'.", default="streamflow")
+@click.option("-m", "--mapping", "mapping", nargs=1, required=False,
+    type=click.Path(dir_okay=False, path_type=Path),
+    help="GeoJSON mapping from USGS sites codes to RFC and WFO. Default usgs_rfc_wfo_mapping.geojson",
+    default=Path("usgs_rfc_wfo_mapping.geojson")
+    )
 def cli(
         destination: Path | None = None,
-        variable: ChannelRouteVariable = ChannelRouteVariable.STREAMFLOW
+        variable: ChannelRouteVariable = ChannelRouteVariable.STREAMFLOW,
+        mapping: Path = Path("usgs_rfc_wfo_mapping.geojson")
 ) -> None:
     """
     Download and process National Water Model version 3.0 Retrospective
@@ -380,7 +386,7 @@ def cli(
     zarr stores for Alasak, Hawaii, Puerto Rico, and CONUS.
     """
     download_to_netcdf(destination, ChannelRouteVariable(variable))
-    generate_symlinks(destination, Path("usgs_rfc_wfo_mapping.geojson"))
+    generate_symlinks(destination, mapping)
 
 if __name__ == "__main__":
     cli()
