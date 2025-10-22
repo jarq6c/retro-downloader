@@ -1,4 +1,9 @@
-"""Command-line interface."""
+"""
+This command-line interface will retrieve National Water Model version 3.0
+Retrospective output and build a WRES-friendly archive of compressed CSVs.
+
+Example usage: retro-downloader -d /path/to/my_archive
+"""
 from pathlib import Path
 import logging
 from dataclasses import dataclass
@@ -64,6 +69,63 @@ class ChannelRouteVariable(StrEnum):
     STREAMFLOW = "streamflow"
     VELOCITY = "velocity"
 
+def build_routelink(destination: Path) -> pd.DataFrame:
+    """
+    Build crosswalk from National Water Model channel feature identifiers to
+    USGS site codes.
+
+    Parameters
+    ----------
+    destination: pathlib.Path
+        Destination directory to build local archive of NWM Retrospective
+        output in NetCDF and WRES-compatible CSV format.
+    
+    Returns
+    -------
+    Resulting crosswalk in a pandas.DataFrame
+    """
+    # Logger
+    logger = get_logger()
+
+    # Check for existing
+    ofile = destination / "routelink.parquet"
+    if ofile.exists():
+        logger.info("Found %s", ofile)
+        return pd.read_parquet(ofile, engine="pyarrow")
+
+    # Handle download location
+    logger.info("Setting up download directory")
+    destination.mkdir(exist_ok=True, parents=True)
+
+    # Process each source
+    logger.info("Building routelink")
+    dfs = []
+    for source in SOURCES:
+        # Open dataset
+        logger.info("Extracting gages %s", source.url)
+        ds = xr.open_dataset(
+            source.url,
+            backend_kwargs={"storage_options": {"anon": True}},
+            engine="zarr"
+        )
+        gages = ds["gage_id"].to_dataframe().iloc[:, :-1]
+
+        # Close dataset
+        ds.close()
+
+        gages["gage_id"] = gages["gage_id"].str.decode("utf-8").str.strip()
+        gages = gages.loc[gages["gage_id"] != ""]
+        dfs.append(gages)
+
+    # Merge
+    logger.info("Merging routelinks")
+    routelink = pd.concat(dfs)
+
+    # Save
+    logger.info("Saving %s", ofile)
+    routelink.to_parquet(ofile, engine="pyarrow")
+    return routelink
+
 def main(
         destination: Path,
         variable: ChannelRouteVariable = ChannelRouteVariable.STREAMFLOW
@@ -83,6 +145,9 @@ def main(
     """
     # Logger
     logger = get_logger()
+
+    # Load crosswalk
+    routelink = build_routelink(destination)
 
     # Process each source
     for source in SOURCES:
